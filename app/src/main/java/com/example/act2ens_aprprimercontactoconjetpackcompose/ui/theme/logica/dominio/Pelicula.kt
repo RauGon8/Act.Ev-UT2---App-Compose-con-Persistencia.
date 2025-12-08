@@ -1,4 +1,7 @@
-package com.example.act2ens_aprprimercontactoconjetpackcompose.ui.theme.logica.dominio
+package com.example.act2ens_aprprimercontactoconjetpackcompose.logica.dominio
 
-class Pelicula {
-}
+data class Pelicula(
+    val id: Int = 0,
+    val titulo: String,
+    val director: String
+)
