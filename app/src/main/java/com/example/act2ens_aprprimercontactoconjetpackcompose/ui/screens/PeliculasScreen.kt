@@ -24,6 +24,31 @@ fun PeliculasScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
+    // Estado para el diálogo de confirmación de borrado
+    var peliculaABorrar by remember { mutableStateOf<Pelicula?>(null) }
+
+    // Diálogo de confirmación al borrar
+    if (peliculaABorrar != null) {
+        AlertDialog(
+            onDismissRequest = { peliculaABorrar = null },
+            title = { Text("Confirmar borrado") },
+            text = { Text("¿Seguro que quieres borrar \"${peliculaABorrar!!.titulo}\"?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.deletePelicula(peliculaABorrar!!)
+                    peliculaABorrar = null
+                }) {
+                    Text("Borrar", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { peliculaABorrar = null }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -41,27 +66,76 @@ fun PeliculasScreen(
             }
         }
     ) { innerPadding ->
-        if (uiState.isLoading) {
-            Box(Modifier.fillMaxSize().padding(innerPadding), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
-            }
-        } else if (uiState.peliculas.isEmpty()) {
-            Box(Modifier.fillMaxSize().padding(innerPadding), contentAlignment = Alignment.Center) {
-                Text("No hay películas. ¡Añade una!")
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(innerPadding),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+        ) {
+            // --- Barra de búsqueda ---
+            OutlinedTextField(
+                value = uiState.searchQuery,
+                onValueChange = { viewModel.onSearchQueryChange(it) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                placeholder = { Text("Buscar película...") },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Buscar") },
+                trailingIcon = {
+                    if (uiState.searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { viewModel.onSearchQueryChange("") }) {
+                            Icon(Icons.Default.Clear, contentDescription = "Limpiar")
+                        }
+                    }
+                },
+                singleLine = true
+            )
+
+            // --- Chip de filtro de favoritos ---
+            Row(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(uiState.peliculas, key = { it.id }) { pelicula ->
-                    PeliculaItem(
-                        pelicula = pelicula,
-                        onDelete = { viewModel.deletePelicula(pelicula) },
-                        onToggleFavorite = { viewModel.toggleFavorite(pelicula) },
-                        onClick = { onNavigateToForm(pelicula.id) }
+                FilterChip(
+                    selected = uiState.showFavoritesOnly,
+                    onClick = { viewModel.toggleShowFavoritesOnly() },
+                    label = { Text("Solo Favoritos") },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = if (uiState.showFavoritesOnly) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                )
+            }
+
+            // --- Contenido principal ---
+            if (uiState.isLoading) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            } else if (uiState.peliculas.isEmpty()) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(
+                        if (uiState.showFavoritesOnly) "No tienes películas favoritas"
+                        else if (uiState.searchQuery.isNotEmpty()) "No se encontraron resultados"
+                        else "No hay películas. ¡Añade una!"
                     )
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(uiState.peliculas, key = { it.id }) { pelicula ->
+                        PeliculaItem(
+                            pelicula = pelicula,
+                            onDelete = { peliculaABorrar = pelicula },
+                            onToggleFavorite = { viewModel.toggleFavorite(pelicula) },
+                            onClick = { onNavigateToForm(pelicula.id) }
+                        )
+                    }
                 }
             }
         }
@@ -112,3 +186,4 @@ fun PeliculaItem(
         }
     }
 }
+

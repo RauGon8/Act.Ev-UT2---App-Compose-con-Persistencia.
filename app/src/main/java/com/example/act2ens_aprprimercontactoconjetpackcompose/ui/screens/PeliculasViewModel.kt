@@ -10,7 +10,9 @@ import kotlinx.coroutines.launch
 
 data class PeliculasUiState(
     val peliculas: List<Pelicula> = emptyList(),
-    val isLoading: Boolean = false
+    val isLoading: Boolean = false,
+    val searchQuery: String = "",
+    val showFavoritesOnly: Boolean = false
 )
 
 class PeliculasViewModel(
@@ -18,21 +20,50 @@ class PeliculasViewModel(
     private val userPreferencesRepository: UserPreferencesRepository
 ) : ViewModel() {
 
+    // Estados de filtro locales
+    private val _searchQuery = MutableStateFlow("")
+    private val _showFavoritesOnly = MutableStateFlow(false)
+
     val uiState: StateFlow<PeliculasUiState> = combine(
         peliculaRepository.allPeliculas,
-        userPreferencesRepository.userPreferencesFlow
-    ) { peliculas, prefs ->
-        val sortedPeliculas = if (prefs.sortByTitle) {
-            peliculas.sortedBy { it.titulo }
+        userPreferencesRepository.userPreferencesFlow,
+        _searchQuery,
+        _showFavoritesOnly
+    ) { peliculas, prefs, query, favOnly ->
+        // 1. Ordenar según preferencia del usuario
+        val sorted = if (prefs.sortByTitle) {
+            peliculas.sortedBy { it.titulo.lowercase() }
         } else {
             peliculas.sortedByDescending { it.updatedAt }
         }
-        PeliculasUiState(peliculas = sortedPeliculas, isLoading = false)
+        // 2. Filtrar por favoritos si está activo
+        val filtered = if (favOnly) sorted.filter { it.isFavorite } else sorted
+        // 3. Filtrar por texto de búsqueda
+        val searched = if (query.isBlank()) filtered else {
+            filtered.filter {
+                it.titulo.contains(query, ignoreCase = true) ||
+                it.genero.contains(query, ignoreCase = true)
+            }
+        }
+        PeliculasUiState(
+            peliculas = searched,
+            isLoading = false,
+            searchQuery = query,
+            showFavoritesOnly = favOnly
+        )
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = PeliculasUiState(isLoading = true)
     )
+
+    fun onSearchQueryChange(query: String) {
+        _searchQuery.value = query
+    }
+
+    fun toggleShowFavoritesOnly() {
+        _showFavoritesOnly.value = !_showFavoritesOnly.value
+    }
 
     fun deletePelicula(pelicula: Pelicula) {
         viewModelScope.launch {
@@ -47,7 +78,7 @@ class PeliculasViewModel(
     }
     
     suspend fun getPeliculaById(id: Int): Pelicula? {
-        return peliculaRepository.allPeliculas.first().find { it.id == id }
+        return peliculaRepository.getById(id)
     }
     
     fun upsertPelicula(pelicula: Pelicula) {

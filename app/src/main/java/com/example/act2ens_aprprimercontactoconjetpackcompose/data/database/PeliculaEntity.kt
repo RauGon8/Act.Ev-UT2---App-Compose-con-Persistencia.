@@ -6,7 +6,10 @@ import androidx.room.PrimaryKey
 
 @Entity(
     tableName = "peliculas",
-    indices = [Index(value = ["updatedAt"])]
+    indices = [
+        Index(value = ["updatedAt"]),
+        Index(value = ["isFavorite"])
+    ]
 )
 data class PeliculaEntity(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,

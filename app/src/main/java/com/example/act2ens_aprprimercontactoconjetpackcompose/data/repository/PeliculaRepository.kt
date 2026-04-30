@@ -24,6 +24,10 @@ class PeliculaRepository(private val peliculaDao: PeliculaDao) {
         peliculaDao.deletePelicula(pelicula.toEntity())
     }
 
+    suspend fun getById(id: Int): Pelicula? {
+        return peliculaDao.getPeliculaById(id)?.toDomain()
+    }
+
     suspend fun toggleFavorite(id: Int, isFavorite: Boolean) {
         peliculaDao.updateFavoriteStatus(id, isFavorite)
     }
